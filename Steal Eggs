@@ -98,7 +98,7 @@ local DEFAULTS = {
     --              clone du Humanoid puis destruction de l'ancien = coupe les connexions/etats
     --              auxquels les detecteurs s'accrochent. WalkSpeed = 0 pendant le deplacement
     --              + purge de la vitesse d'assemblage a chaque phase
-    MoveMode = "humtween",
+    MoveMode = "walk",
     -- En cas de detection/rejet/mort, bascule definitivement sur ce mode
     MoveFallback = "walk",
     MoveTimeout = 60,           -- temps max d'un trajet en secondes avant abandon
@@ -2559,6 +2559,16 @@ local function buildUI()
         pcall(function() M.humRestore() end)
         _G.EggMode()
     end)
+    sCtl:AddButton("  SUR  (walk - discret)", function()
+        pcall(function() M.humRestore() end)
+        _G.EggMode("walk")
+        log("mode securise -> walk")
+    end, COL.green)
+    sCtl:AddButton("  RAPIDE (humtween - risque BAC)", function()
+        pcall(function() M.humRestore() end)
+        _G.EggMode("humtween")
+        log("mode rapide -> humtween (risque de kick 267)")
+    end, COL.amber)
     sCtl:AddButton("  STOP", function() _G.EggStop() end, COL.red)
 
     local sSt = tabFarm:AddSection("Statut")
