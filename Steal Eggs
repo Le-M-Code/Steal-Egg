@@ -2139,6 +2139,377 @@ function MUI.New(opts)
             win.active = tab
         end))
 
+        -- ==== constructeurs de sections/elements (dans la portee de `tab`) ====
+        local _Section
+        _Section = function(subtitle)
+            local sec = { title = subtitle, container = nil, elements = {} }
+            sec.container = Instance.new("Frame")
+            sec.container.Size = UDim2.new(1, 0, 0, 24)
+            sec.container.BackgroundColor3 = COL.panel
+            sec.container.BorderSizePixel = 0
+            sec.container.Parent = tab.panel
+            rr(sec.container, 10)
+            stroke(sec.container)
+            Instance.new("UIStroke", sec.container).Thickness = 1
+
+            local head = Instance.new("TextLabel")
+            head.Size = UDim2.new(1, -20, 0, 26)
+            head.Position = UDim2.new(0, 12, 0, 2)
+            head.BackgroundTransparency = 1
+            head.Font = Enum.Font.GothamBold
+            head.TextSize = 12
+            head.TextColor3 = COL.active2
+            head.TextXAlignment = Enum.TextXAlignment.Left
+            head.Text = string.upper(subtitle)
+            head.Parent = sec.container
+
+            local lay = Instance.new("UIListLayout")
+            lay.Padding = UDim.new(0, 6)
+            lay.Parent = sec.container
+            local pad = Instance.new("UIPadding")
+            pad.PaddingTop = UDim.new(0, 30)
+            pad.PaddingLeft = UDim.new(0, 12)
+            pad.PaddingRight = UDim.new(0, 12)
+            pad.PaddingBottom = UDim.new(0, 12)
+            pad.Parent = sec.container
+
+            local function resize()
+                local total = pad.PaddingTop.Offset + 26
+                for _, el in ipairs(sec.elements) do
+                    total = total + el.height + lay.Padding.Offset
+                end
+                total = total - lay.Padding.Offset + pad.PaddingBottom.Offset
+                sec.container.Size = UDim2.new(1, 0, 0, total)
+            end
+            sec.resize = resize
+
+            -- element : bouton simple
+            local function addButton(text, fn, color)
+                local b = Instance.new("TextButton")
+                b.Size = UDim2.new(1, 0, 0, 34)
+                b.BackgroundColor3 = color or COL.panel2
+                b.BorderSizePixel = 0
+                b.Font = Enum.Font.Gotham
+                b.TextSize = 13
+                b.TextColor3 = COL.text
+                b.Text = text
+                b.Parent = sec.container
+                rr(b, 8)
+                b:SetAttribute("base", color or COL.panel2)
+                track(b.MouseEnter:Connect(function() b.BackgroundColor3 = COL.hover end))
+                track(b.MouseLeave:Connect(function() b.BackgroundColor3 = b:GetAttribute("base") or COL.panel2 end))
+                track(b.MouseButton1Click:Connect(function() pcall(fn, b) end))
+                local el = { height = 34, btn = b }
+                sec.elements[#sec.elements + 1] = el
+                sec.resize()
+                local handle = {}
+                function handle:SetText(t) b.Text = t end
+                function handle:SetColor(c) b.BackgroundColor3 = c; b:SetAttribute("base", c) end
+                return handle
+            end
+
+            local function addToggle(text, default, fn)
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, 0, 0, 34)
+                row.BackgroundColor3 = COL.panel2
+                row.BorderSizePixel = 0
+                row.Parent = sec.container
+                rr(row, 8)
+
+                local lab = Instance.new("TextLabel")
+                lab.Size = UDim2.new(1, -70, 1, 0)
+                lab.Position = UDim2.new(0, 12, 0, 0)
+                lab.BackgroundTransparency = 1
+                lab.Font = Enum.Font.Gotham
+                lab.TextSize = 13
+                lab.TextColor3 = COL.text
+                lab.TextXAlignment = Enum.TextXAlignment.Left
+                lab.Text = text
+                lab.Parent = row
+
+                local trackFrame = Instance.new("Frame")
+                trackFrame.Size = UDim2.new(0, 46, 0, 22)
+                trackFrame.Position = UDim2.new(1, -58, 0.5, -11)
+                trackFrame.BackgroundColor3 = COL.track
+                trackFrame.BorderSizePixel = 0
+                trackFrame.Parent = row
+                rr(trackFrame, 11)
+
+                local knob = Instance.new("Frame")
+                knob.Size = UDim2.new(0, 18, 0, 18)
+                knob.Position = UDim2.new(0, 2, 0.5, -9)
+                knob.BackgroundColor3 = COL.dim
+                knob.BorderSizePixel = 0
+                knob.Parent = trackFrame
+                rr(knob, 9)
+
+                local on = default == true
+                local function set(v)
+                    on = v
+                    trackFrame.BackgroundColor3 = on and COL.green or COL.track
+                    knob.BackgroundColor3 = on and Color3.fromRGB(255,255,255) or COL.dim
+                    knob.Position = on and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
+                end
+                set(on)
+                track(row.MouseButton1Click:Connect(function()
+                    set(not on)
+                    pcall(fn, on)
+                end))
+                local el = { height = 34 }
+                sec.elements[#sec.elements + 1] = el
+                sec.resize()
+                local handle = {}
+                function handle:Set(v) set(v == true) end
+                function handle:Get() return on end
+                return handle
+            end
+
+            local function addSlider(text, min, max, def, fn, step)
+                step = step or 1
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, 0, 0, 44)
+                row.BackgroundColor3 = COL.panel2
+                row.BorderSizePixel = 0
+                row.Parent = sec.container
+                rr(row, 8)
+
+                local lab = Instance.new("TextLabel")
+                lab.Size = UDim2.new(1, -70, 0, 16)
+                lab.Position = UDim2.new(0, 12, 0, 8)
+                lab.BackgroundTransparency = 1
+                lab.Font = Enum.Font.Gotham
+                lab.TextSize = 13
+                lab.TextColor3 = COL.text
+                lab.TextXAlignment = Enum.TextXAlignment.Left
+                lab.Text = text
+                lab.Parent = row
+
+                local val = Instance.new("TextLabel")
+                val.Size = UDim2.new(0, 56, 0, 16)
+                val.Position = UDim2.new(1, -64, 0, 8)
+                val.BackgroundTransparency = 1
+                val.Font = Enum.Font.GothamBold
+                val.TextSize = 13
+                val.TextColor3 = COL.active2
+                val.TextXAlignment = Enum.TextXAlignment.Right
+                val.Text = "0"
+                val.Parent = row
+
+                local trackFrame = Instance.new("Frame")
+                trackFrame.Size = UDim2.new(1, -24, 0, 6)
+                trackFrame.Position = UDim2.new(0, 12, 1, -12)
+                trackFrame.BackgroundColor3 = COL.track
+                trackFrame.BorderSizePixel = 0
+                trackFrame.Parent = row
+                rr(trackFrame, 3)
+
+                local fill = Instance.new("Frame")
+                fill.Size = UDim2.new(0, 0, 1, 0)
+                fill.BackgroundColor3 = COL.active
+                fill.BorderSizePixel = 0
+                fill.Parent = trackFrame
+                rr(fill, 3)
+
+                local knob = Instance.new("Frame")
+                knob.Size = UDim2.new(0, 18, 0, 18)
+                knob.AnchorPoint = Vector2.new(0.5, 0.5)
+                knob.Position = UDim2.new(0, 0, 0.5, 0)
+                knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+                knob.BorderSizePixel = 0
+                knob.Parent = trackFrame
+                rr(knob, 9)
+                stroke(knob)
+
+                local cur = def or min
+                local function set(v, silent)
+                    cur = math.clamp(v, min, max)
+                    cur = min + math.floor((cur - min) / step + 0.5) * step
+                    cur = math.clamp(cur, min, max)
+                    local frac = (max > min) and (cur - min) / (max - min) or 0
+                    fill.Size = UDim2.new(frac, 0, 1, 0)
+                    knob.Position = UDim2.new(frac, 0, 0.5, 0)
+                    val.Text = (step >= 1) and tostring(math.floor(cur))
+                        or string.format("%." .. #tostring(step):match("%d+") .. "f", cur)
+                    if not silent then pcall(fn, cur) end
+                end
+
+                local UIS = game:GetService("UserInputService")
+                local dragging = false
+                local function trackDrag()
+                    local x = UIS:GetMouseLocation().X - trackFrame.AbsolutePosition.X
+                    local w = math.max(1, trackFrame.AbsoluteSize.X)
+                    set(min + (x / w) * (max - min))
+                end
+                track(trackFrame.InputBegan:Connect(function(i)
+                    if i.UserInputType == Enum.UserInputType.MouseButton1
+                        or i.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        trackDrag()
+                    end
+                end))
+                track(UIS.InputChanged:Connect(function(i)
+                    if not dragging then return end
+                    if i.UserInputType ~= Enum.UserInputType.MouseMovement
+                        and i.UserInputType ~= Enum.UserInputType.Touch then return end
+                    trackDrag()
+                end))
+                track(UIS.InputEnded:Connect(function(i)
+                    if i.UserInputType == Enum.UserInputType.MouseButton1
+                        or i.UserInputType == Enum.UserInputType.Touch then
+                        dragging = false
+                    end
+                end))
+                set(cur, true)
+                local el = { height = 44 }
+                sec.elements[#sec.elements + 1] = el
+                sec.resize()
+                local handle = {}
+                function handle:Set(v) set(v, true) end
+                function handle:Get() return cur end
+                return handle
+            end
+
+            local function addDropdown(text, items, def, fn)
+                local b = Instance.new("TextButton")
+                b.Size = UDim2.new(1, 0, 0, 34)
+                b.BackgroundColor3 = COL.panel2
+                b.BorderSizePixel = 0
+                b.Font = Enum.Font.Gotham
+                b.TextSize = 13
+                b.TextColor3 = COL.text
+                b.Text = text
+                b.TextXAlignment = Enum.TextXAlignment.Left
+                b.Parent = sec.container
+                rr(b, 8)
+                local arrow = Instance.new("TextLabel")
+                arrow.Size = UDim2.new(0, 20, 1, 0)
+                arrow.Position = UDim2.new(1, -26, 0, 0)
+                arrow.BackgroundTransparency = 1
+                arrow.Font = Enum.Font.GothamBold
+                arrow.TextSize = 12
+                arrow.TextColor3 = COL.dim
+                arrow.Text = "\226\150\190"
+                arrow.Parent = b
+
+                local cur = def
+                local function label()
+                    for _, it in ipairs(items) do if it == cur then return it end end
+                    return tostring(cur)
+                end
+                b.Text = text .. " : " .. label()
+
+                local el = { height = 34, open = false }
+                sec.elements[#sec.elements + 1] = el
+                track(b.MouseButton1Click:Connect(function()
+                    for _, c in ipairs(b:GetChildren()) do
+                        if c:IsA("TextButton") and c ~= b then c:Destroy() end
+                    end
+                    if el.open then
+                        for _ = 1, el.dropped or 0 do table.remove(sec.elements) end
+                        el.dropped = 0
+                        el.open = false
+                        b.BackgroundColor3 = COL.panel2
+                        arrow.Text = "\226\150\190"
+                        sec.resize()
+                        return
+                    end
+                    el.open = true
+                    b.BackgroundColor3 = COL.hover
+                    arrow.Text = "\226\150\178"
+                    el.dropped = 0
+                    local i = 0
+                    for _, it in ipairs(items) do
+                        i = i + 1
+                        local itb = Instance.new("TextButton")
+                        local sel = (it == cur)
+                        itb.Size = UDim2.new(1, 0, 0, 30)
+                        itb.Position = UDim2.new(0, 0, 1, i * 32)
+                        itb.BackgroundColor3 = sel and COL.active or COL.panel
+                        itb.BorderSizePixel = 0
+                        itb.Font = Enum.Font.Gotham
+                        itb.TextSize = 12
+                        itb.TextColor3 = sel and Color3.fromRGB(255,255,255) or COL.dim
+                        itb.Text = "       " .. tostring(it)
+                        itb.TextXAlignment = Enum.TextXAlignment.Left
+                        itb.Parent = b
+                        rr(itb, 6)
+                        track(itb.MouseButton1Click:Connect(function()
+                            cur = it
+                            el.open = false
+                            b.BackgroundColor3 = COL.panel2
+                            b.Text = text .. " : " .. tostring(it)
+                            pcall(fn, it)
+                            for _, c in ipairs(b:GetChildren()) do
+                                if c:IsA("TextButton") and c ~= b then c:Destroy() end
+                            end
+                            for _ = 1, el.dropped or 0 do table.remove(sec.elements) end
+                            el.dropped = 0
+                            sec.resize()
+                        end))
+                        sec.elements[#sec.elements + 1] = { height = 30 }
+                        el.dropped = el.dropped + 1
+                        sec.resize()
+                    end
+                end))
+                local handle = {}
+                function handle:Set(v) cur = v; b.Text = text .. " : " .. tostring(v) end
+                function handle:Get() return cur end
+                return handle, b
+            end
+
+            local function addCheck(text, dim, default, fn)
+                local c = Instance.new("TextButton")
+                c.Size = UDim2.new(0, dim or 120, 0, 30)
+                c.BackgroundColor3 = default and COL.green or COL.panel2
+                c.BorderSizePixel = 0
+                c.Font = Enum.Font.Gotham
+                c.TextSize = 12
+                c.TextColor3 = COL.text
+                c.Text = text
+                c.Parent = sec.container
+                rr(c, 7)
+                local on = default == true
+                track(c.MouseButton1Click:Connect(function()
+                    on = not on
+                    c.BackgroundColor3 = on and COL.green or COL.panel2
+                    pcall(fn, on)
+                end))
+                local el = { height = 34 }
+                sec.elements[#sec.elements + 1] = el
+                sec.resize()
+                local handle = {}
+                function handle:Set(v) on = v; c.BackgroundColor3 = v and COL.green or COL.panel2 end
+                function handle:Get() return on end
+                return handle
+            end
+
+            sec._AddButton = addButton
+            sec.AddButton = addButton
+            sec.AddToggle = addToggle
+            sec.AddSlider = addSlider
+            sec.AddDropdown = addDropdown
+            sec.AddCheck = addCheck
+
+            tab.sections[#tab.sections + 1] = sec
+            return sec
+        end
+        tab._Section = _Section
+        tab.Section = _Section
+        tab.AddSection = _Section
+        tab._GridRow = function(parent, cols)
+            local grid = Instance.new("Frame")
+            grid.Size = UDim2.new(1, 0, 0, 34)
+            grid.BackgroundTransparency = 1
+            grid.Parent = parent
+            local gl = Instance.new("UIGridLayout")
+            gl.CellSize = UDim2.new(0, 206, 0, 30)
+            gl.CellPadding = UDim.new(0, 4)
+            gl.FillDirection = Enum.FillDirection.Horizontal
+            gl.HorizontalAlignment = Enum.HorizontalAlignment.Left
+            gl.Parent = grid
+            return grid, gl
+        end
+
         win.tabs[#win.tabs + 1] = tab
         return tab
     end
@@ -2151,376 +2522,6 @@ function MUI.New(opts)
         tab.btn.TextColor3 = COL.text
         tab.barAcc.Visible = true
         win.active = tab
-    end
-
-    function tab:_Section(title)
-        local sec = { title = title, container = nil, elements = {} }
-        sec.container = Instance.new("Frame")
-        sec.container.Size = UDim2.new(1, 0, 0, 24)
-        sec.container.BackgroundColor3 = COL.panel
-        sec.container.BorderSizePixel = 0
-        sec.container.Parent = tab.panel
-        rr(sec.container, 10)
-        stroke(sec.container)
-        Instance.new("UIStroke", sec.container).Thickness = 1
-
-        local head = Instance.new("TextLabel")
-        head.Size = UDim2.new(1, -20, 0, 26)
-        head.Position = UDim2.new(0, 12, 0, 2)
-        head.BackgroundTransparency = 1
-        head.Font = Enum.Font.GothamBold
-        head.TextSize = 12
-        head.TextColor3 = COL.active2
-        head.TextXAlignment = Enum.TextXAlignment.Left
-        head.Text = string.upper(title)
-        head.Parent = sec.container
-
-        local lay = Instance.new("UIListLayout")
-        lay.Padding = UDim.new(0, 6)
-        lay.Parent = sec.container
-        local pad = Instance.new("UIPadding")
-        pad.PaddingTop = UDim.new(0, 30)
-        pad.PaddingLeft = UDim.new(0, 12)
-        pad.PaddingRight = UDim.new(0, 12)
-        pad.PaddingBottom = UDim.new(0, 12)
-        pad.Parent = sec.container
-
-        -- recalcule la hauteur du container selon ses enfants
-        local function resize()
-            local total = pad.PaddingTop.Offset + 26
-            for _, el in ipairs(sec.elements) do
-                total = total + el.height + lay.Padding.Offset
-            end
-            total = total - lay.Padding.Offset + pad.PaddingBottom.Offset
-            sec.container.Size = UDim2.new(1, 0, 0, total)
-        end
-        sec.resize = resize
-        tab.sections[#tab.sections + 1] = sec
-        return sec
-    end
-    function tab:Section(title)
-        return tab:_Section(title)
-    end
-    function tab:AddSection(title)
-        return tab:_Section(title)
-    end
-
-    -- element : bouton simple
-    function sec:_AddButton(text, fn, color)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(1, 0, 0, 34)
-        b.BackgroundColor3 = color or COL.panel2
-        b.BorderSizePixel = 0
-        b.Font = Enum.Font.Gotham
-        b.TextSize = 13
-        b.TextColor3 = COL.text
-        b.Text = text
-        b.Parent = sec.container
-        rr(b, 8)
-        b:SetAttribute("base", color or COL.panel2)
-        track(b.MouseEnter:Connect(function() b.BackgroundColor3 = COL.hover end))
-        track(b.MouseLeave:Connect(function() b.BackgroundColor3 = b:GetAttribute("base") or COL.panel2 end))
-        track(b.MouseButton1Click:Connect(function() pcall(fn, b) end))
-        local el = { height = 34, btn = b }
-        sec.elements[#sec.elements + 1] = el
-        sec.resize()
-        local handle = {}
-        function handle:SetText(t) b.Text = t end
-        function handle:SetColor(c) b.BackgroundColor3 = c; b:SetAttribute("base", c) end
-        return handle
-    end
-    function sec:AddButton(text, fn) return sec:_AddButton(text, fn) end
-
-    function sec:AddToggle(text, default, fn)
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, 0, 0, 34)
-        row.BackgroundColor3 = COL.panel2
-        row.BorderSizePixel = 0
-        row.Parent = sec.container
-        rr(row, 8)
-
-        local lab = Instance.new("TextLabel")
-        lab.Size = UDim2.new(1, -70, 1, 0)
-        lab.Position = UDim2.new(0, 12, 0, 0)
-        lab.BackgroundTransparency = 1
-        lab.Font = Enum.Font.Gotham
-        lab.TextSize = 13
-        lab.TextColor3 = COL.text
-        lab.TextXAlignment = Enum.TextXAlignment.Left
-        lab.Text = text
-        lab.Parent = row
-
-        local trackFrame = Instance.new("Frame")
-        trackFrame.Size = UDim2.new(0, 46, 0, 22)
-        trackFrame.Position = UDim2.new(1, -58, 0.5, -11)
-        trackFrame.BackgroundColor3 = COL.track
-        trackFrame.BorderSizePixel = 0
-        trackFrame.Parent = row
-        rr(trackFrame, 11)
-
-        local knob = Instance.new("Frame")
-        knob.Size = UDim2.new(0, 18, 0, 18)
-        knob.Position = UDim2.new(0, 2, 0.5, -9)
-        knob.BackgroundColor3 = COL.dim
-        knob.BorderSizePixel = 0
-        knob.Parent = trackFrame
-        rr(knob, 9)
-
-        local on = default == true
-        local function set(v)
-            on = v
-            trackFrame.BackgroundColor3 = on and COL.green or COL.track
-            knob.BackgroundColor3 = on and Color3.fromRGB(255,255,255) or COL.dim
-            knob.Position = on and UDim2.new(1, -20, 0.5, -9) or UDim2.new(0, 2, 0.5, -9)
-        end
-        set(on)
-        track(row.MouseButton1Click:Connect(function()
-            set(not on)
-            pcall(fn, on)
-        end))
-        local el = { height = 34 }
-        sec.elements[#sec.elements + 1] = el
-        sec.resize()
-        local handle = {}
-        function handle:Set(v) set(v == true) end
-        function handle:Get() return on end
-        return handle
-    end
-
-    function sec:AddSlider(text, min, max, def, fn, step)
-        step = step or 1
-        local row = Instance.new("Frame")
-        row.Size = UDim2.new(1, 0, 0, 44)
-        row.BackgroundColor3 = COL.panel2
-        row.BorderSizePixel = 0
-        row.Parent = sec.container
-        rr(row, 8)
-
-        local lab = Instance.new("TextLabel")
-        lab.Size = UDim2.new(1, -70, 0, 16)
-        lab.Position = UDim2.new(0, 12, 0, 8)
-        lab.BackgroundTransparency = 1
-        lab.Font = Enum.Font.Gotham
-        lab.TextSize = 13
-        lab.TextColor3 = COL.text
-        lab.TextXAlignment = Enum.TextXAlignment.Left
-        lab.Text = text
-        lab.Parent = row
-
-        local val = Instance.new("TextLabel")
-        val.Size = UDim2.new(0, 56, 0, 16)
-        val.Position = UDim2.new(1, -64, 0, 8)
-        val.BackgroundTransparency = 1
-        val.Font = Enum.Font.GothamBold
-        val.TextSize = 13
-        val.TextColor3 = COL.active2
-        val.TextXAlignment = Enum.TextXAlignment.Right
-        val.Text = "0"
-        val.Parent = row
-
-        local trackFrame = Instance.new("Frame")
-        trackFrame.Size = UDim2.new(1, -24, 0, 6)
-        trackFrame.Position = UDim2.new(0, 12, 1, -12)
-        trackFrame.BackgroundColor3 = COL.track
-        trackFrame.BorderSizePixel = 0
-        trackFrame.Parent = row
-        rr(trackFrame, 3)
-
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.new(0, 0, 1, 0)
-        fill.BackgroundColor3 = COL.active
-        fill.BorderSizePixel = 0
-        fill.Parent = trackFrame
-        rr(fill, 3)
-
-        local knob = Instance.new("Frame")
-        knob.Size = UDim2.new(0, 18, 0, 18)
-        knob.AnchorPoint = Vector2.new(0.5, 0.5)
-        knob.Position = UDim2.new(0, 0, 0.5, 0)
-        knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        knob.BorderSizePixel = 0
-        knob.Parent = trackFrame
-        rr(knob, 9)
-        stroke(knob)
-
-        local cur = def or min
-        local function set(v, silent)
-            cur = math.clamp(v, min, max)
-            cur = min + math.floor((cur - min) / step + 0.5) * step
-            cur = math.clamp(cur, min, max)
-            local frac = (max > min) and (cur - min) / (max - min) or 0
-            fill.Size = UDim2.new(frac, 0, 1, 0)
-            knob.Position = UDim2.new(frac, 0, 0.5, 0)
-            val.Text = (step >= 1) and tostring(math.floor(cur))
-                or string.format("%." .. #tostring(step):match("%d+") .. "f", cur)
-            if not silent then pcall(fn, cur) end
-        end
-
-        local UIS = game:GetService("UserInputService")
-        local dragging = false
-        local function trackDrag()
-            local x = UIS:GetMouseLocation().X - trackFrame.AbsolutePosition.X
-            local w = math.max(1, trackFrame.AbsoluteSize.X)
-            set(min + (x / w) * (max - min))
-        end
-        track(trackFrame.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-                or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                trackDrag()
-            end
-        end))
-        track(UIS.InputChanged:Connect(function(i)
-            if not dragging then return end
-            if i.UserInputType ~= Enum.UserInputType.MouseMovement
-                and i.UserInputType ~= Enum.UserInputType.Touch then return end
-            trackDrag()
-        end))
-        track(UIS.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1
-                or i.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end))
-        set(cur, true)
-        local el = { height = 44 }
-        sec.elements[#sec.elements + 1] = el
-        sec.resize()
-        local handle = {}
-        function handle:Set(v) set(v, true) end
-        function handle:Get() return cur end
-        return handle
-    end
-
-    -- element : liste de selection (une valeur)
-    function sec:AddDropdown(text, items, def, fn)
-        local b = Instance.new("TextButton")
-        b.Size = UDim2.new(1, 0, 0, 34)
-        b.BackgroundColor3 = COL.panel2
-        b.BorderSizePixel = 0
-        b.Font = Enum.Font.Gotham
-        b.TextSize = 13
-        b.TextColor3 = COL.text
-        b.Text = text
-        b.TextXAlignment = Enum.TextXAlignment.Left
-        b.Parent = sec.container
-        rr(b, 8)
-        local arrow = Instance.new("TextLabel")
-        arrow.Size = UDim2.new(0, 20, 1, 0)
-        arrow.Position = UDim2.new(1, -26, 0, 0)
-        arrow.BackgroundTransparency = 1
-        arrow.Font = Enum.Font.GothamBold
-        arrow.TextSize = 12
-        arrow.TextColor3 = COL.dim
-        arrow.Text = "\226\150\190"
-        arrow.Parent = b
-
-        local cur = def
-        local function label()
-            for _, it in ipairs(items) do if it == cur then return it end end
-            return tostring(cur)
-        end
-        b.Text = text .. " : " .. label()
-
-        local el = { height = 34, open = false }
-        sec.elements[#sec.elements + 1] = el
-        track(b.MouseButton1Click:Connect(function()
-            for _, c in ipairs(b:GetChildren()) do
-                if c:IsA("TextButton") and c ~= b then c:Destroy() end
-            end
-            if el.open then
-                for _ = 1, el.dropped or 0 do table.remove(sec.elements) end
-                el.dropped = 0
-                el.open = false
-                b.BackgroundColor3 = COL.panel2
-                arrow.Text = "\226\150\190"
-                sec.resize()
-                return
-            end
-            el.open = true
-            b.BackgroundColor3 = COL.hover
-            arrow.Text = "\226\150\178"
-            el.dropped = 0
-            local i = 0
-            for _, it in ipairs(items) do
-                i = i + 1
-                local itb = Instance.new("TextButton")
-                local sel = (it == cur)
-                itb.Size = UDim2.new(1, 0, 0, 30)
-                itb.Position = UDim2.new(0, 0, 1, i * 32)
-                itb.BackgroundColor3 = sel and COL.active or COL.panel
-                itb.BorderSizePixel = 0
-                itb.Font = Enum.Font.Gotham
-                itb.TextSize = 12
-                itb.TextColor3 = sel and Color3.fromRGB(255,255,255) or COL.dim
-                itb.Text = "       " .. tostring(it)
-                itb.TextXAlignment = Enum.TextXAlignment.Left
-                itb.Parent = b
-                rr(itb, 6)
-                track(itb.MouseButton1Click:Connect(function()
-                    cur = it
-                    el.open = false
-                    b.BackgroundColor3 = COL.panel2
-                    b.Text = text .. " : " .. tostring(it)
-                    pcall(fn, it)
-                    for _, c in ipairs(b:GetChildren()) do
-                        if c:IsA("TextButton") and c ~= b then c:Destroy() end
-                    end
-                    for _ = 1, el.dropped or 0 do table.remove(sec.elements) end
-                    el.dropped = 0
-                    sec.resize()
-                end))
-                sec.elements[#sec.elements + 1] = { height = 30 }
-                el.dropped = el.dropped + 1
-                sec.resize()
-            end
-        end))
-        local handle = {}
-        function handle:Set(v) cur = v; b.Text = text .. " : " .. tostring(v) end
-        function handle:Get() return cur end
-        return handle, b
-    end
-
-    -- element : case a cocher simple (liste de zones)
-    function sec:AddCheck(text, dim, default, fn)
-        local c = Instance.new("TextButton")
-        c.Size = UDim2.new(0, dim or 120, 0, 30)
-        c.BackgroundColor3 = default and COL.green or COL.panel2
-        c.BorderSizePixel = 0
-        c.Font = Enum.Font.Gotham
-        c.TextSize = 12
-        c.TextColor3 = COL.text
-        c.Text = text
-        c.Parent = sec.container
-        rr(c, 7)
-        local on = default == true
-        track(c.MouseButton1Click:Connect(function()
-            on = not on
-            c.BackgroundColor3 = on and COL.green or COL.panel2
-            pcall(fn, on)
-        end))
-        local el = { height = 34 }
-        sec.elements[#sec.elements + 1] = el
-        sec.resize()
-        local handle = {}
-        function handle:Set(v) on = v; c.BackgroundColor3 = v and COL.green or COL.panel2 end
-        function handle:Get() return on end
-        return handle
-    end
-
-    -- layout en grille pour les cases (zone)
-    function tab:_GridRow(parent, cols)
-        local grid = Instance.new("Frame")
-        grid.Size = UDim2.new(1, 0, 0, 34)
-        grid.BackgroundTransparency = 1
-        grid.Parent = parent
-        local lay = Instance.new("UIGridLayout")
-        lay.CellSize = UDim2.new(0, 206, 0, 30)
-        lay.CellPadding = UDim.new(0, 4)
-        lay.FillDirection = Enum.FillDirection.Horizontal
-        lay.HorizontalAlignment = Enum.HorizontalAlignment.Left
-        lay.Parent = grid
-        return grid, lay
     end
 
     return win
